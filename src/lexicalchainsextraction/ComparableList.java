@@ -14,6 +14,15 @@ import java.util.List;
  */
 class ComparableList<T extends String> extends ArrayList<String> implements Comparable<List<T>> {
 
+    public ComparableList() {
+        super();
+    }
+    
+
+    ComparableList(ComparableList<String> lsCurTokens) {
+        super(lsCurTokens);
+    }
+
     @Override
     public int compareTo(List<T> o) {
         return this.toString().compareTo(o.toString());

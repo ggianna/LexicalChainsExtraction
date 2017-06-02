@@ -21,6 +21,12 @@ public class ComparablePair<A, B> extends Pair<A, B> implements Comparable<Pair<
     public int compareTo(Pair<A, B> o) {
         return toString().compareTo(o.toString());
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        return toString().equals(obj.toString());
+    }
+    
     
     
 }

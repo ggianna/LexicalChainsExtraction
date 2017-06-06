@@ -66,9 +66,14 @@ public class LexicalChainsExtraction {
                 lsToConvert.size()).toString().hashCode());
     }
     
+    /**
+     * Splits a text, taking into account only letters (and digits).
+     * @param sText The text to split
+     * @return A list of the tokenized/split sentence.
+     */
     protected List<String> split(String sText) {
         return new ArrayList<>(Arrays.asList(
-                sText.trim().replaceAll("[^a-zA-Z ]", " ").toLowerCase().split("\\s+")));
+                sText.trim().replaceAll("[^a-zA-Z0-9, ]", " ").toLowerCase().split("\\s+")));
     }
     
     
@@ -288,7 +293,7 @@ public class LexicalChainsExtraction {
             lToReturn.add(new ComparableGradedText(eCur.getValue(), eCur.getKey()));
         }
         // Now sort list, based on value
-        Collections.sort(lToReturn, new ComparatorImpl());
+        Collections.sort(lToReturn, new DescendingComparatorImpl());
         
         
         // Keep sublist
@@ -362,19 +367,19 @@ public class LexicalChainsExtraction {
         }
     }
 
-    private static class ComparatorImpl implements Comparator<ComparableGradedText> {
+    private static class DescendingComparatorImpl implements Comparator<ComparableGradedText> {
 
-        public ComparatorImpl() {
+        public DescendingComparatorImpl() {
         }
 
         @Override
         public int compare(ComparableGradedText o1, ComparableGradedText o2) {
-            int iRes = (int)(Math.signum(o1.getFirst() - o2.getFirst()));
+            int iRes = -(int)(Math.signum(o1.getFirst() - o2.getFirst()));
             // If identical in terms of value
             // use string ordering
             if (iRes == 0)
-                return o1.getSecond().toString().compareTo(
-                        o2.getSecond().toString());
+                return -(o1.getSecond().toString().compareTo(
+                        o2.getSecond().toString()));
             return iRes;
         }
     }

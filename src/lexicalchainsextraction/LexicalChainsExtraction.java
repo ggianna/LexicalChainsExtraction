@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -20,6 +21,8 @@ import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -31,6 +34,9 @@ public class LexicalChainsExtraction {
     Set<Integer> sAlphabet = new TreeSet<>();
     List<String> lsFullText = new ArrayList<>();
     protected String DOC_DELIMITER = String.valueOf('\u0000');
+    Set<String> ssStopwords = new HashSet<>(Arrays.asList(
+            utils.loadFileToStringWithNewlines("english.list").split("\\s*\n\\s*")));
+        
 
     public void analyzeDocuments(int iMinSize, int iMaxSize) {
         double dTotal = getDocumentCount();
@@ -72,8 +78,16 @@ public class LexicalChainsExtraction {
      * @return A list of the tokenized/split sentence.
      */
     protected List<String> split(String sText) {
-        return new ArrayList<>(Arrays.asList(
-                sText.trim().replaceAll("[^a-zA-Z0-9, ]", " ").toLowerCase().split("\\s+")));
+        List<String> lsRes = new ArrayList<>(Arrays.asList(
+                sText.trim().replaceAll("[^a-zA-Z0-9' ]", " ").toLowerCase().split("\\s+")));
+        
+        return lsRes.stream().filter(new Predicate<String>() {
+
+            @Override
+            public boolean test(String t) {
+                return !ssStopwords.contains(t);
+            }
+        }).collect(Collectors.toList());
     }
     
     
@@ -99,7 +113,7 @@ public class LexicalChainsExtraction {
         
         // Now extract most probable sequences
         List<ComparableGradedText> dBestSequences = 
-                le.getBestSequences(iMinSize,iMaxSize, 1000);
+                le.getBestSequences(iMinSize,iMaxSize, 100);
         
         // Show them
         System.out.println("Most promising sequences:\n" +

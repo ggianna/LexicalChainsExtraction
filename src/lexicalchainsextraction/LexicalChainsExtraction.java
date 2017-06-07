@@ -1,18 +1,35 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+/**
+ * Copyright 2017 George Giannakopoulos
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
  */
+
 package lexicalchainsextraction;
 
 import gr.demokritos.iit.conceptualIndex.structs.Distribution;
 import gr.demokritos.iit.jinsect.structs.CategorizedFileEntry;
 import gr.demokritos.iit.jinsect.structs.DocumentSet;
 import gr.demokritos.iit.jinsect.utils;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -22,6 +39,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Predicate;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -79,7 +98,9 @@ public class LexicalChainsExtraction {
      */
     protected List<String> split(String sText) {
         List<String> lsRes = new ArrayList<>(Arrays.asList(
-                sText.trim().replaceAll("[^a-zA-Z0-9' ]", " ").toLowerCase().split("\\s+")));
+                sText.trim().replaceAll("[^a-zA-Z0-9' ]", " ").replaceAll(
+                    "[\"]|([']){2,}", " ").replaceAll(
+                            "'s", " ").toLowerCase().split("\\s+")));
         
         return lsRes.stream().filter(new Predicate<String>() {
 
@@ -113,11 +134,23 @@ public class LexicalChainsExtraction {
         
         // Now extract most probable sequences
         List<ComparableGradedText> dBestSequences = 
-                le.getBestSequences(iMinSize,iMaxSize, 100);
+                le.getBestSequences(iMinSize,iMaxSize, Integer.MAX_VALUE);
         
-        // Show them
-        System.out.println("Most promising sequences:\n" +
-                utils.printIterable(dBestSequences, "\n"));
+        try {
+            // Save them
+            File fTmp = File.createTempFile(new Date().getTime() + "out", ".txt");
+            {
+                // Do the writing
+                new BufferedWriter(new FileWriter(fTmp)).write(
+                        le.sequencesToString(dBestSequences));
+            }
+            System.out.println("Most promising sequences saved to " + fTmp.getAbsolutePath());
+            
+        } catch (IOException ex) {
+            Logger.getLogger(LexicalChainsExtraction.class.getName()).log(Level.SEVERE, null, ex);
+            System.out.println("Most promising sequences output, because saving failed. " +
+                le.sequencesToString(dBestSequences));
+        }
         
     }
     
@@ -311,7 +344,7 @@ public class LexicalChainsExtraction {
         
         
         // Keep sublist
-        lToReturn = lToReturn.subList(0, iNumToReturn);
+        lToReturn = lToReturn.subList(0, Math.min(lToReturn.size(), iNumToReturn));
 
         // DEBUG LINES
         appendToLog(String.format("Keeping top performers... Done."));
@@ -319,9 +352,9 @@ public class LexicalChainsExtraction {
         return lToReturn;
     }
 
-    protected void analyzeDocument(int iMinSize, int iMaxSize, String sText) {
+    protected void analyzeDocument(int iMinSize, int iMaxSize, final String sText) {
         // Split in tokens
-        List<String> lsTokens = split(sText);
+        final List<String> lsTokens = split(sText);
         // Add to overall document
         lsFullText.addAll(lsTokens);
         // TODO: Add document delimiter
@@ -329,38 +362,43 @@ public class LexicalChainsExtraction {
         
         // Analyze single tokens
         analyzeSingleTokens(lsTokens);
-
+        
+        // For every n-gram size
         for (int iCurSize = iMinSize; iCurSize <= iMaxSize; iCurSize++) {
-            List<String> lsCurTokens = new ArrayList<>();
+            analyzeNGramsOfSize(lsTokens, iCurSize);
+        } // end for every n-gram size
+    }
 
-            ListIterator<String> liCur = lsTokens.listIterator();
-
-            // For every remaining token
-            while (liCur.hasNext()) {
-                String sCur = liCur.next();
-                // On new document
-                if (sCur.equals(DOC_DELIMITER)) {
-                    // Clear current token list
-                    lsCurTokens.clear();
-                    // Continue to next token
-                    continue;
-                }
-                lsCurTokens.add(sCur);
-
-                // If we exceeded the n-gram size
-                if (lsCurTokens.size() > iCurSize) {
-                    // remove the oldest token from the prefix
-                    lsCurTokens.remove(0); 
-                }
-                if (lsCurTokens.size() == iCurSize) {
-                    // Update the occurrences of the prefix-suffix pair
+    protected void analyzeNGramsOfSize(List<String> lsTokens, int iCurSize) {
+        List<String> lsCurTokens = new ArrayList<>();
+        
+        ListIterator<String> liCur = lsTokens.listIterator();
+        
+        // For every remaining token
+        while (liCur.hasNext()) {
+            String sCur = liCur.next();
+            // On new document
+            if (sCur.equals(DOC_DELIMITER)) {
+                // Clear current token list
+                lsCurTokens.clear();
+                // Continue to next token
+                continue;
+            }
+            lsCurTokens.add(sCur);
+            
+            // If we exceeded the n-gram size
+            if (lsCurTokens.size() > iCurSize) {
+                // remove the oldest token from the prefix
+                lsCurTokens.remove(0);
+            }
+            if (lsCurTokens.size() == iCurSize) {
+                // Update the occurrences of the prefix-suffix pair
                     dStringCounts.increaseValue(
                             toHash(lsCurTokens),
                             1.0);
-                }
             }
-
-        } // end for every n-gram size
+        }
+        
     }
 
     protected void analyzeSingleTokens(List<String> lsTokens) {
@@ -379,6 +417,16 @@ public class LexicalChainsExtraction {
             sAlphabet.add(sCur.hashCode());
 
         }
+    }
+
+    private String sequencesToString(List<ComparableGradedText> dBestSequences) {
+        StringBuffer sb = new StringBuffer();
+        // For every graded text
+        for (ComparableGradedText cgtCur : dBestSequences) {
+            sb.append(cgtCur.getFirst()).append("\t").append(utils.printIterable(
+                    cgtCur.getSecond(), " ")).append("\n");
+        }
+        return sb.toString();
     }
 
     private static class DescendingComparatorImpl implements Comparator<ComparableGradedText> {
